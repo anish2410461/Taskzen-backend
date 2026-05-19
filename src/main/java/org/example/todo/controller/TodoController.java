@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/todos")
 @RequiredArgsConstructor
-@CrossOrigin(origins = { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" })
+@CrossOrigin(origins = { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "https://taskzen-frontend.onrender.com" })
 public class TodoController {
 
     private final TodoService todoService;
