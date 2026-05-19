@@ -25,7 +25,7 @@ public class EmailService {
     private final UserRepository userRepository;
 
     // Runs every hour
-    @Scheduled(fixedRate = 360000)
+    @Scheduled(fixedRate = 3600000)
     public void sendOverdueReminders() {
         System.out.println("Running scheduled task: Checking for overdue tasks...");
 
@@ -86,7 +86,7 @@ public class EmailService {
     private final java.util.Set<String> notifiedPreAlertIds = new java.util.concurrent.ConcurrentHashMap<String, Boolean>()
             .keySet(Boolean.TRUE);
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 300000)
     public void sendPreAlertReminders() {
         System.out.println("Running scheduled task: Checking for tasks due soon (pre-alert)...");
         LocalDateTime now = LocalDateTime.now();
