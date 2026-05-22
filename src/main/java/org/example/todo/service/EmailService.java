@@ -25,7 +25,7 @@ public class EmailService {
     private final UserRepository userRepository;
 
     // Runs every hour
-    @Scheduled(fixedRate = 600000)
+    @Scheduled(fixedRate = 60000)
     public void sendOverdueReminders() {
         System.out.println("Running scheduled task: Checking for overdue tasks...");
 
