@@ -24,13 +24,26 @@ public class EmailService {
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
 
-    // Runs every hour
-    @Scheduled(fixedRate = 60000)
+    private final java.util.Set<String> notifiedOverdueIds =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private final java.util.Set<String> notifiedPreAlertIds =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    // Runs every 5 minutes
+    @Scheduled(fixedRate = 300000)
     public void sendOverdueReminders() {
         System.out.println("Running scheduled task: Checking for overdue tasks...");
 
         List<Todo> pendingTodos = todoRepository.findByCompleted(false);
         LocalDate today = LocalDate.now();
+
+        // Evict no longer overdue / completed / deleted tasks from the cache
+        java.util.Set<String> currentlyOverdueIds = pendingTodos.stream()
+                .filter(t -> t.getDueDate() != null && t.getDueDate().isBefore(today) && t.getId() != null)
+                .map(Todo::getId)
+                .collect(Collectors.toSet());
+        notifiedOverdueIds.retainAll(currentlyOverdueIds);
 
         // Group pending tasks by userEmail
         Map<String, List<Todo>> tasksByUser = pendingTodos.stream()
@@ -41,15 +54,20 @@ public class EmailService {
             String email = entry.getKey();
             List<Todo> userTasks = entry.getValue();
 
-            // Find how many are overdue (dueDate < today)
+            // Find how many are overdue (dueDate < today) and not yet notified
             List<Todo> overdueTasks = userTasks.stream()
-                    .filter(t -> t.getDueDate() != null && t.getDueDate().isBefore(today))
+                    .filter(t -> t.getDueDate() != null && t.getDueDate().isBefore(today) && !notifiedOverdueIds.contains(t.getId()))
                     .collect(Collectors.toList());
 
             if (!overdueTasks.isEmpty()) {
                 // Find user to get their name
                 userRepository.findByEmail(email).ifPresent(user -> {
                     sendEmail(user, overdueTasks);
+                    for (Todo task : overdueTasks) {
+                        if (task.getId() != null) {
+                            notifiedOverdueIds.add(task.getId());
+                        }
+                    }
                 });
             }
         }
@@ -83,9 +101,6 @@ public class EmailService {
         }
     }
 
-    private final java.util.Set<String> notifiedPreAlertIds = new java.util.concurrent.ConcurrentHashMap<String, Boolean>()
-            .keySet(Boolean.TRUE);
-
     @Scheduled(fixedRate = 300000)
     public void sendPreAlertReminders() {
         System.out.println("Running scheduled task: Checking for tasks due soon (pre-alert)...");
@@ -93,6 +108,16 @@ public class EmailService {
         LocalDateTime threshold = now.plusMinutes(30);
 
         List<Todo> pendingTodos = todoRepository.findByCompleted(false);
+
+        // Evict tasks that are no longer in the pre-alert window from the cache
+        java.util.Set<String> currentlyPreAlertIds = pendingTodos.stream()
+                .filter(t -> {
+                    LocalDateTime due = t.getDueDateTime();
+                    return due != null && due.isBefore(threshold) && due.isAfter(now) && t.getId() != null;
+                })
+                .map(Todo::getId)
+                .collect(Collectors.toSet());
+        notifiedPreAlertIds.retainAll(currentlyPreAlertIds);
 
         for (Todo todo : pendingTodos) {
             LocalDateTime due = todo.getDueDateTime();
